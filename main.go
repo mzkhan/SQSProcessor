@@ -5,11 +5,18 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sync"
+	"time"
+
+	"github.com/aws/aws-sdk-go/service/sqs"
 )
 
 type Message struct {
 	Value string `json:"message"`
 }
+type fn func(message *sqs.Message) (string, error)
+
+var wg sync.WaitGroup
 
 func main() {
 	address := "127.0.0.1:8080"
@@ -85,17 +92,20 @@ func HandleReceiveMessage(rs http.ResponseWriter, rq *http.Request, queueName st
 		http.Error(rs, err.Error(), 500)
 		return
 	}
-	log.Println("Messages Received: ", len(result.Messages))
+	msgCount := len(result.Messages)
+	log.Println("Messages Received: ", msgCount)
 
+	// For each of the message, we are spawning a new thread for message consumption
+	//	We can have a wait and signal mechanism to wait till all the processing is completed
+	//	However, this make the message receive API synchronous
+
+	//wg.Add(msgCount)
 	for _, msg := range result.Messages {
-		_, errDelete := DeleteMessage(msg, svc, queueURL)
-		if errDelete != nil {
-			http.Error(rs, err.Error(), 500)
-			log.Println("Error in deleting", errDelete)
-		} else {
-			log.Println("Deleted Message successfully: ", msg.Body)
-		}
+		go ConsumeMessage(msg, svc, queueURL, ProcessMessage)
 	}
+	// wg.Wait()
+
+	log.Println("All messages dispatched for consumption")
 	output, err := json.Marshal(result)
 	if err != nil {
 		http.Error(rs, err.Error(), 500)
@@ -104,4 +114,36 @@ func HandleReceiveMessage(rs http.ResponseWriter, rq *http.Request, queueName st
 	rs.WriteHeader(http.StatusOK)
 	rs.Header().Set("content-type", "application/json")
 	rs.Write(output)
+}
+
+func ProcessMessage(message *sqs.Message) (string, error) {
+	// This is the function that will add the processing logic
+	// for each of the received message
+
+	// The implementation should be such that in case of multiple
+	//	delivery of a message, the processing should be idempotent
+
+	//Adding a wait of 10 seconds to account for processing time
+
+	log.Println("In Process Message. MessageID: ", message)
+	time.Sleep(time.Duration(10) * time.Second)
+	log.Println("Message Processing Completed")
+	return "Success", nil
+}
+
+func ConsumeMessage(message *sqs.Message, svc *sqs.SQS, qURL *string, processFn fn) (string, error) {
+
+	// Uncomment if we want to have a join for each of message consumption thread
+	// defer wg.Done()
+	returnMessage, err := processFn(message)
+	if err != nil {
+		return returnMessage, err
+	}
+	_, errDelete := DeleteMessage(message, svc, qURL)
+	if errDelete != nil {
+		log.Println("Error in deleting", errDelete)
+		return "Deletion Failed", errDelete
+	}
+	log.Println("Deleted Message successfully: ", message.Body)
+	return "success", nil
 }
