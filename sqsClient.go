@@ -78,3 +78,15 @@ func SendMessage(message string, svc *sqs.SQS, qURL *string) (*sqs.SendMessageOu
 	return result, err
 
 }
+
+/*
+DeleteMessage sends the message to the queue specified by the qURL
+	using the session specified by svc
+*/
+func DeleteMessage(message *sqs.Message, svc *sqs.SQS, qURL *string) (*sqs.DeleteMessageOutput, error) {
+	result, err := svc.DeleteMessage(&sqs.DeleteMessageInput{
+		QueueUrl:      qURL,
+		ReceiptHandle: message.ReceiptHandle,
+	})
+	return result, err
+}

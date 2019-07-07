@@ -86,6 +86,16 @@ func HandleReceiveMessage(rs http.ResponseWriter, rq *http.Request, queueName st
 		return
 	}
 	log.Println("Messages Received: ", len(result.Messages))
+
+	for _, msg := range result.Messages {
+		_, errDelete := DeleteMessage(msg, svc, queueURL)
+		if errDelete != nil {
+			http.Error(rs, err.Error(), 500)
+			log.Println("Error in deleting", errDelete)
+		} else {
+			log.Println("Deleted Message successfully: ", msg.Body)
+		}
+	}
 	output, err := json.Marshal(result)
 	if err != nil {
 		http.Error(rs, err.Error(), 500)
