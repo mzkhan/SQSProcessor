@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/sqs"
@@ -14,18 +13,29 @@ import (
 type Message struct {
 	Value string `json:"message"`
 }
-type fn func(message *sqs.Message) (string, error)
 
-var wg sync.WaitGroup
+type ChannelMessage struct {
+	message *sqs.Message
+	qURL    *string
+}
+
+//var MessageChannel chan ChannelMessage
+var MessageChannel chan *sqs.Message
+
+var svc *sqs.SQS
 
 func main() {
-	address := "127.0.0.1:8080"
+
+	MessageChannel = make(chan *sqs.Message)
+	svc = SetupQueueSession()
+	address := ":8080"
 	log.Println("Starting server on address", address)
 	http.HandleFunc("/message", handle_message)
 	err := http.ListenAndServe(address, nil)
 	if err != nil {
 		panic(err)
 	}
+
 }
 
 func handle_message(rs http.ResponseWriter, rq *http.Request) {
@@ -62,9 +72,8 @@ func HandleSendMessage(rs http.ResponseWriter, rq *http.Request, queueName strin
 	}
 
 	//setup the SQS client session and get the queue URL
-	svc := SetupQueueSession()
-	queueURL := GetQueueURL(svc, queueName)
 
+	queueURL := GetQueueURL(svc, queueName)
 	result, err := SendMessage(msg.Value, svc, queueURL)
 	if err != nil {
 		http.Error(rs, err.Error(), 500)
@@ -84,9 +93,7 @@ func HandleSendMessage(rs http.ResponseWriter, rq *http.Request, queueName strin
 
 func HandleReceiveMessage(rs http.ResponseWriter, rq *http.Request, queueName string) {
 	//setup the SQS client session and get the queue URL
-	svc := SetupQueueSession()
 	queueURL := GetQueueURL(svc, queueName)
-
 	result, err := ReceiveMessage(svc, queueURL, 10)
 	if err != nil {
 		http.Error(rs, err.Error(), 500)
@@ -101,7 +108,10 @@ func HandleReceiveMessage(rs http.ResponseWriter, rq *http.Request, queueName st
 
 	//wg.Add(msgCount)
 	for _, msg := range result.Messages {
-		go ConsumeMessage(msg, svc, queueURL, ProcessMessage)
+		go ConsumeMessage(queueURL)
+		go func() {
+			MessageChannel <- msg
+		}()
 	}
 	// wg.Wait()
 
@@ -131,17 +141,18 @@ func ProcessMessage(message *sqs.Message) (string, error) {
 	return "Success", nil
 }
 
-func ConsumeMessage(message *sqs.Message, svc *sqs.SQS, qURL *string, processFn fn) (string, error) {
+func ConsumeMessage(qURL *string) (string, error) {
 
 	// Uncomment if we want to have a join for each of message consumption thread
 	// defer wg.Done()
-	returnMessage, err := processFn(message)
+	message := <-MessageChannel
+	returnMessage, err := ProcessMessage(message)
 	if err != nil {
 		return returnMessage, err
 	}
 	_, errDelete := DeleteMessage(message, svc, qURL)
 	if errDelete != nil {
-		log.Println("Error in deleting", errDelete)
+		log.Fatal("Error in deleting", errDelete)
 		return "Deletion Failed", errDelete
 	}
 	log.Println("Deleted Message successfully: ", message.Body)
