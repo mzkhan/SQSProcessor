@@ -15,7 +15,7 @@ type Message struct {
 	Value string `json:"message"`
 }
 
-var wg sync.WaitGroup
+// var wg sync.WaitGroup
 var terminatePoll chan int64
 
 // We can extend this code to add a poller for one message queue,
