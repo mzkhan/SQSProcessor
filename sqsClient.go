@@ -54,12 +54,12 @@ func GetQueueURL(svc *sqs.SQS, queueName string) *string {
 ReceiveMessage received the message from the queue specified by the qURL,
 	using the session specified by svc
 */
-func ReceiveMessage(svc *sqs.SQS, qURL *string, maxMessages int64) (*sqs.ReceiveMessageOutput, error) {
+func ReceiveMessage(svc *sqs.SQS, qURL *string, maxMessages int64, WaitTimeSeconds int64) (*sqs.ReceiveMessageOutput, error) {
 	result, err := svc.ReceiveMessage(&sqs.ReceiveMessageInput{
 		QueueUrl:            qURL,
 		MaxNumberOfMessages: aws.Int64(maxMessages),
 		VisibilityTimeout:   aws.Int64(60), // 60 seconds
-		WaitTimeSeconds:     aws.Int64(0),
+		WaitTimeSeconds:     aws.Int64(WaitTimeSeconds),
 	})
 
 	return result, err
