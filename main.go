@@ -113,16 +113,21 @@ func StartPoll(queueName string) {
 				continue
 			}
 			// For each of the message, we are spawning a new thread for message consumption
-			//	We wait until all the messages received are processed before
-			//	making another receive call
+			//	We can wait until all the messages received are processed before
+			//	making another receive call, however, in case there is one message that causes the 
+			//	thread to stall, we will have no message getting consumed.
+			//	So, commenting out the wait group usage, and adding a 30 seconds wait after message
+			//	dequeuing.
 
 			log.Println("Messages Received: ", msgCount)
 
-			wg.Add(msgCount)
+			// wg.Add(msgCount)
 			for _, msg := range result.Messages {
 				go ConsumeMessage(msg, svc, queueURL)
 			}
-			wg.Wait()
+			// wg.Wait()
+			log.Println("Message processing threads dispatched \nWaiting for 30 seconds before the next receive")
+				time.Sleep(time.Duration(30) * time.Second)
 		}
 	}
 
@@ -143,8 +148,8 @@ func ProcessMessage(message *sqs.Message) (string, error) {
 }
 
 func ConsumeMessage(message *sqs.Message, svc *sqs.SQS, qURL *string) (string, error) {
-	//
-	defer wg.Done()
+	// Commenting out the waitGroup usage to avoid system stall because of one message
+	// defer wg.Done()
 	returnMessage, err := ProcessMessage(message)
 	if err != nil {
 		// In case of an error, we can retry and send the message to
