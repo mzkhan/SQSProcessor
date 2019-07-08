@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/sqs"
@@ -25,9 +26,16 @@ var MessageChannel chan *sqs.Message
 var svc *sqs.SQS
 
 func main() {
+	args := os.Args[1:]
+	configName := "default"
+	region := "us-east-1"
+	if len(args) > 0 {
+		configName = args[0]
+		region = args[1]
+	}
 
 	MessageChannel = make(chan *sqs.Message)
-	svc = SetupQueueSession()
+	svc = SetupQueueSession(configName, region)
 	address := ":8080"
 	log.Println("Starting server on address", address)
 	http.HandleFunc("/message", handle_message)

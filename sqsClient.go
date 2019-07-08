@@ -15,10 +15,10 @@ import (
 SetupQueueSession sets up the seesion with the SQS
 
 */
-func SetupQueueSession() *sqs.SQS {
+func SetupQueueSession(configName string, region string) *sqs.SQS {
 	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String("us-east-1"),
-		Credentials: credentials.NewSharedCredentials("", "test-config"),
+		Region:      aws.String(region),
+		Credentials: credentials.NewSharedCredentials("", configName),
 	})
 
 	if err != nil {
