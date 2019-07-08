@@ -19,7 +19,8 @@ aws_secret_access_key = <<access_key_value>
 
 ## Starting the server
 
-`$ go run main.go "test-config" "us-east-1" `
+`$ go run main.go ["test-config"] ["us-east-1"] `
+The last 2 parameters are optional
 
 # Send Message
 ```html
@@ -29,7 +30,7 @@ Accept: application/json
 Body {"message": "Message12"}
 ```
 
-# Consume Message
+# Stop Polling
 ```html
-GET /message?queueName=queue1
+GET /stopPoll
 ```
